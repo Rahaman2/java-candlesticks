@@ -1,22 +1,28 @@
 package com.candlesticks;
 
+import com.candlesticks.backtest.*;
 import com.candlesticks.interfaces.ICandle;
+import com.candlesticks.loader.CsvLoader;
+import com.candlesticks.loader.JsonLoader;
 import com.candlesticks.pattern.*;
 import com.candlesticks.patterns.BuiltInPatterns;
 import com.candlesticks.registry.PatternRegistry;
 import com.candlesticks.scanner.CandleScanner;
 
+import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 /**
- * Demo of the candlestick pattern library (Batch 1 + Batch 2).
+ * Console demo — Batch 1 + 2 (pattern scanner) + Batch 4 (data loader, backtesting).
  *
- * <p>Run:   mvn compile exec:java -Dexec.mainClass=com.candlesticks.Main</p>
- * <p>Chart: mvn javafx:run</p>
+ * <p>Run:   {@code mvn compile exec:java -Dexec.mainClass=com.candlesticks.Main}</p>
+ * <p>Chart: {@code mvn javafx:run}</p>
  */
 public class Main {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
         // ── Sample series crafted to exercise multi-candle patterns ──────────
         //
@@ -141,6 +147,96 @@ public class Main {
         System.out.println();
         System.out.printf("Registered patterns: %d  |  Matches found: %d%n",
                 registry.size(), results.size());
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  Batch 4 — Data Loader + Backtesting
+        // ══════════════════════════════════════════════════════════════════════
+
+        System.out.println();
+        System.out.println("════════════════════════════════════════════════════════════════════");
+        System.out.println("  Batch 4 — Data Loader & Backtesting");
+        System.out.println("════════════════════════════════════════════════════════════════════");
+
+        // ── 4a. Load from CSV ─────────────────────────────────────────────────
+        Path csvPath     = resourcePath("sample.csv");
+        List<Candle> csvCandles  = CsvLoader.load(csvPath);
+        System.out.printf("%nCSV  loader : %d candles from %s%n", csvCandles.size(), csvPath.getFileName());
+
+        // ── 4b. Load from JSON (CCXT format) ──────────────────────────────────
+        Path jsonPath    = resourcePath("sample.json");
+        List<Candle> jsonCandles = JsonLoader.load(jsonPath);
+        System.out.printf("JSON loader : %d candles from %s%n", jsonCandles.size(), jsonPath.getFileName());
+
+        // ── 4c. Simple pattern-based strategy ────────────────────────────────
+        //
+        //   BUY  — any BULLISH pattern, conf ≥ 0.70
+        //   SELL — any BEARISH pattern, conf ≥ 0.70
+        //   HOLD — otherwise
+        //
+        Strategy patternStrategy = (patterns, candle) -> {
+            boolean bullish = patterns.stream().anyMatch(p ->
+                    p.metadata().direction() == PatternDirection.BULLISH
+                    && p.metadata().confidence() >= 0.70);
+            boolean bearish = patterns.stream().anyMatch(p ->
+                    p.metadata().direction() == PatternDirection.BEARISH
+                    && p.metadata().confidence() >= 0.70);
+            if (bullish) return Signal.BUY;
+            if (bearish) return Signal.SELL;
+            return Signal.HOLD;
+        };
+
+        BacktestRunner runner = new BacktestRunner(
+                BuiltInPatterns.createScanner(),
+                BacktestConfig.defaults());
+
+        System.out.println();
+        System.out.println("── Strategy: pattern-based (conf ≥ 70%)  —  CSV data ───────────────");
+        runner.run(csvCandles, patternStrategy).print();
+
+        // ── 4d. Compare two strategies concurrently via Virtual Threads ───────
+        //
+        //   Strategy A: conf ≥ 0.60   (more trades, lower bar)
+        //   Strategy B: conf ≥ 0.75   (fewer trades, higher conviction)
+        //
+        Strategy stratA = (patterns, candle) -> {
+            if (patterns.stream().anyMatch(p ->
+                    p.metadata().direction() == PatternDirection.BULLISH
+                    && p.metadata().confidence() >= 0.60)) return Signal.BUY;
+            if (patterns.stream().anyMatch(p ->
+                    p.metadata().direction() == PatternDirection.BEARISH
+                    && p.metadata().confidence() >= 0.60)) return Signal.SELL;
+            return Signal.HOLD;
+        };
+
+        Strategy stratB = (patterns, candle) -> {
+            if (patterns.stream().anyMatch(p ->
+                    p.metadata().direction() == PatternDirection.BULLISH
+                    && p.metadata().confidence() >= 0.75)) return Signal.BUY;
+            if (patterns.stream().anyMatch(p ->
+                    p.metadata().direction() == PatternDirection.BEARISH
+                    && p.metadata().confidence() >= 0.75)) return Signal.SELL;
+            return Signal.HOLD;
+        };
+
+        System.out.println();
+        System.out.println("── Multi-strategy comparison (Virtual Threads)  —  JSON data ────────");
+        List<BacktestResult> multiResults = runner.runAll(jsonCandles, List.of(stratA, stratB));
+
+        String[] names = {"Strategy A (conf ≥ 60%)", "Strategy B (conf ≥ 75%)"};
+        for (int i = 0; i < multiResults.size(); i++) {
+            System.out.printf("%n  %s%n", names[i]);
+            multiResults.get(i).print();
+        }
+
+        System.out.println();
         System.out.println("Run 'mvn javafx:run' to open the chart viewer.");
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Resolve a resource file packaged in src/main/resources. */
+    private static Path resourcePath(String name) throws Exception {
+        URI uri = Main.class.getClassLoader().getResource(name).toURI();
+        return Paths.get(uri);
     }
 }
