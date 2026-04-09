@@ -40,12 +40,18 @@ public class CandleChartPane extends VBox {
     private static final double LEGEND_HDR_H = 44.0;
     private static final double LEGEND_PAD   = 14.0;
 
-    // computed in constructor
-    private final double slotW;
-    private final double bodyW;
-    private final double canvasW;
+    // computed in constructor; mutable to support live update()
+    private double slotW;
+    private double bodyW;
+    private double canvasW;
+    private final double paneWidth;
+
+    // canvas instances kept for live redraws
+    private final Canvas chart;
+    private final Canvas legend;
 
     public CandleChartPane(List<CandleProps> candles, List<PatternResult> results, double paneWidth) {
+        this.paneWidth = paneWidth;
         double chartArea = paneWidth - MARGIN_LEFT - MARGIN_RIGHT;
         slotW   = Math.max(chartArea / candles.size(), 6.0);
         bodyW   = Math.max(slotW * 0.68, 2.0);
@@ -54,14 +60,34 @@ public class CandleChartPane extends VBox {
         setBackground(new Background(new BackgroundFill(BACKGROUND, CornerRadii.EMPTY, Insets.EMPTY)));
         setPrefWidth(canvasW);
 
-        Canvas chart  = new Canvas(canvasW, CHART_H);
+        chart  = new Canvas(canvasW, CHART_H);
         drawChart(chart.getGraphicsContext2D(), candles, results);
 
         double legendH = LEGEND_HDR_H + results.size() * ROW_H + LEGEND_PAD;
-        Canvas legend  = new Canvas(canvasW, legendH);
+        legend  = new Canvas(canvasW, legendH);
         drawLegend(legend.getGraphicsContext2D(), results, legendH);
 
         getChildren().addAll(chart, legend);
+    }
+
+    /**
+     * Refresh the chart with a new candle series and pattern results.
+     * Safe to call from the JavaFX Application Thread via {@code Platform.runLater()}.
+     */
+    public void update(List<CandleProps> candles, List<PatternResult> results) {
+        double chartArea = paneWidth - MARGIN_LEFT - MARGIN_RIGHT;
+        slotW   = Math.max(chartArea / candles.size(), 6.0);
+        bodyW   = Math.max(slotW * 0.68, 2.0);
+        canvasW = Math.max(MARGIN_LEFT + candles.size() * slotW + MARGIN_RIGHT, paneWidth);
+
+        setPrefWidth(canvasW);
+        chart.setWidth(canvasW);
+        drawChart(chart.getGraphicsContext2D(), candles, results);
+
+        double legendH = LEGEND_HDR_H + results.size() * ROW_H + LEGEND_PAD;
+        legend.setWidth(canvasW);
+        legend.setHeight(legendH);
+        drawLegend(legend.getGraphicsContext2D(), results, legendH);
     }
 
     // ── Chart ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Candlesticks — Live</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #131722; color: #d1d4dc; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    #toolbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 16px; background: #1e222d; border-bottom: 1px solid #2a2e39;
+    }
+    #toolbar label { font-size: 12px; color: #787b86; }
+    #toolbar select, #toolbar input {
+      background: #2a2e39; color: #d1d4dc; border: 1px solid #363a45;
+      border-radius: 4px; padding: 4px 8px; font-size: 12px;
+    }
+    .btn {
+      cursor: pointer; border-radius: 4px; padding: 4px 10px;
+      font-size: 12px; border: 1px solid #363a45;
+      background: #2a2e39; color: #d1d4dc;
+    }
+    .btn.primary { background: #2962ff; border-color: #2962ff; color: #fff; }
+    .btn.primary:hover { background: #1e53e5; }
+    .btn.active   { border-color: currentColor; }
+    .btn.ind-vol  { color: #787b86; }
+    .btn.ind-vol.active  { color: #64b5f6; background: #1a2333; }
+    .btn.ind-sma20 { color: #787b86; }
+    .btn.ind-sma20.active { color: #f6bf26; background: #1a2333; }
+    .btn.ind-ema50 { color: #787b86; }
+    .btn.ind-ema50.active { color: #26a69a; background: #1a2333; }
+    .btn.ind-ema200 { color: #787b86; }
+    .btn.ind-ema200.active { color: #ef5350; background: #1a2333; }
+    .btn.ind-patterns { color: #787b86; }
+    .btn.ind-patterns.active { color: #ce93d8; background: #1a2333; }
+    .separator { width: 1px; height: 20px; background: #2a2e39; margin: 0 4px; }
+
+    #status { margin-left: auto; font-size: 12px; color: #787b86; }
+    #status.connected { color: #26a69a; }
+
+    #chart-container { width: 100%; height: calc(100vh - 44px - 140px); }
+
+    #pattern-list {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #1e222d; border-top: 1px solid #2a2e39;
+      height: 140px; overflow-y: auto;
+      font-size: 12px; padding: 4px 16px;
+    }
+    #pattern-list table { width: 100%; border-collapse: collapse; }
+    #pattern-list th { color: #787b86; font-weight: 600; text-align: left; padding: 2px 8px; position: sticky; top: 0; background: #1e222d; }
+    #pattern-list td { padding: 2px 8px; }
+    .bull { color: #26a69a; }
+    .bear { color: #ef5350; }
+    .neut { color: #f0b429; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <label>Symbol</label>
+  <input id="sym-input" type="text" value="BTCUSDT" style="width:100px"/>
+  <label>Interval</label>
+  <select id="interval-select">
+    <option value="1m">1m</option>
+    <option value="3m">3m</option>
+    <option value="5m">5m</option>
+    <option value="15m">15m</option>
+    <option value="30m">30m</option>
+    <option value="1h">1h</option>
+    <option value="4h" selected>4h</option>
+    <option value="1d">1d</option>
+  </select>
+  <button class="btn primary" id="subscribe-btn">Subscribe</button>
+
+  <div class="separator"></div>
+
+  <label>Indicators</label>
+  <button class="btn ind-vol"   id="btn-vol"      data-ind="vol">Vol</button>
+  <button class="btn ind-sma20" id="btn-sma20"    data-ind="sma20">SMA 20</button>
+  <button class="btn ind-ema50" id="btn-ema50"    data-ind="ema50">EMA 50</button>
+  <button class="btn ind-ema200" id="btn-ema200"  data-ind="ema200">EMA 200</button>
+  <button class="btn ind-patterns" id="btn-patterns" data-ind="patterns">Patterns</button>
+
+  <span id="status">Connecting…</span>
+</div>
+
+<div id="chart-container"></div>
+
+<div id="pattern-list">
+  <table>
+    <thead><tr>
+      <th>IDX</th><th>PATTERN</th><th>TYPE</th><th>DIRECTION</th><th>STRENGTH</th><th>CONF</th>
+    </tr></thead>
+    <tbody id="pattern-tbody"></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="chart.js"></script>
+</body>
+</html>

@@ -43,7 +43,7 @@ public class CandleScanner {
         List<PatternResult> results = new ArrayList<>();
 
         for (PatternDefinition def : registry.getAll()) {
-            int paramCount = def.paramCount();
+            int paramCount = def.paramCount(); // how many candles the definition needs for defining.
             int upperBound = props.size() - paramCount;
 
             for (int i = 0; i <= upperBound; i++) {
